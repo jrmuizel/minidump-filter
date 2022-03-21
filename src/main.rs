@@ -12,6 +12,7 @@ use num_traits::cast::FromPrimitive;
 
 fn filter(
     output: &mut MmapMut,
+    base_address: u64,
     start: u32,
     length: u32,
     address_size: usize,
@@ -22,7 +23,8 @@ fn filter(
     let mut amount_zeroed = 0;
     for i in (start..start + length).step_by(address_size) {
         let addr = u64::from_le_bytes(output[i..i + address_size].try_into().unwrap());
-        if modules.module_at_address(addr).is_none() {
+        let self_reference = addr >= base_address && addr < (base_address + length as u64);
+        if modules.module_at_address(addr).is_none() && !self_reference {
             output[i..i + address_size].fill(0);
             amount_zeroed += address_size;
         }
@@ -95,6 +97,7 @@ fn main() {
         total_considered += m.desc.memory.data_size;
         total_zeroed += filter(
             &mut output,
+            m.base_address,
             m.desc.memory.rva,
             m.desc.memory.data_size,
             pointer_width,
